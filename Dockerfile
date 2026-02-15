@@ -13,15 +13,13 @@ RUN apk add --no-cache --virtual .build-deps \
     && apk add --no-cache \
     libffi
 
-# Copy only requirements first for better layer caching
+# Copy package metadata and source code
 COPY pyproject.toml ./
+COPY src/ ./src/
 
 # Install the package
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -e .
-
-# Copy the rest of the application
-COPY src/ ./src/
 
 # Remove build dependencies to reduce image size
 RUN apk del .build-deps
