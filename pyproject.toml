@@ -1,0 +1,26 @@
+[project]
+name = "mcp-imap-server"
+version = "0.1.0"
+description = "An MCP server that exposes IMAP email as tools"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-only" }
+authors = [{ name = "daniele" }]
+dependencies = [
+  "mcp>=1.0.0",
+  "imapclient>=3.0.1",
+  "python-dotenv>=1.0.1",
+]
+
+[project.scripts]
+mcp-imap-server = "mcp_imap_server.server:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
