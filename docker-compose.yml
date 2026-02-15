@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  mcp-imap-server:
+    build: .
+    container_name: mcp-imap-server
+    restart: unless-stopped
+    ports:
+      - "8993:8993"
+    environment:
+      # IMAP Configuration (Required)
+      - IMAP_HOST=${IMAP_HOST}
+      - IMAP_USERNAME=${IMAP_USERNAME}
+      - IMAP_PASSWORD=${IMAP_PASSWORD}
+      
+      # IMAP Configuration (Optional)
+      - IMAP_PORT=${IMAP_PORT:-993}
+      - IMAP_SSL=${IMAP_SSL:-true}
+      - IMAP_STARTTLS=${IMAP_STARTTLS:-false}
+      - IMAP_TIMEOUT_SECONDS=${IMAP_TIMEOUT_SECONDS:-30}
+      
+      # MCP Server Configuration (Optional)
+      - MCP_TRANSPORT=${MCP_TRANSPORT:-streamable-http}
+      - MCP_HOST=${MCP_HOST:-0.0.0.0}
+      - MCP_PORT=${MCP_PORT:-8993}
+      - MCP_MOUNT_PATH=${MCP_MOUNT_PATH:-}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8993/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s

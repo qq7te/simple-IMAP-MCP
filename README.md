@@ -80,7 +80,46 @@ IMAP_PASSWORD=your-password
 
 ## Usage
 
-### Running as HTTP Server (Recommended for Remote Access)
+### Running with Docker (Recommended)
+
+The easiest way to run the server is using Docker:
+
+1. Build the Docker image:
+```bash
+docker build -t mcp-imap-server .
+```
+
+2. Run with environment variables:
+```bash
+docker run -d \
+  --name mcp-imap-server \
+  -p 8993:8993 \
+  -e IMAP_HOST=imap.gmail.com \
+  -e IMAP_USERNAME=your-email@gmail.com \
+  -e IMAP_PASSWORD=your-app-password \
+  mcp-imap-server
+```
+
+3. Or use docker-compose with your `.env` file:
+```bash
+docker-compose up -d
+```
+
+The server will be available at `http://localhost:8993/mcp`
+
+To view logs:
+```bash
+docker logs -f mcp-imap-server
+```
+
+To stop:
+```bash
+docker-compose down
+# or
+docker stop mcp-imap-server
+```
+
+### Running as HTTP Server (Native)
 
 This mode allows AI clients on other machines (like Warp) to connect to your email server:
 
