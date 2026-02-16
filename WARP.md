@@ -23,7 +23,7 @@
 
 2. **Security Disabled for Non-Localhost**: When binding to non-localhost addresses (e.g., `0.0.0.0`), DNS rebinding protection is disabled. This is necessary for remote access but should be documented as a security consideration for users.
 
-3. **Read-Only by Default**: Most operations (search, fetch, list) are read-only. Only `set_seen` modifies server state, making the tool safer for exploratory use.
+3. **Read-Only by Default**: Most operations (search, fetch, list, download) are read-only. Only `set_seen` modifies server state, making the tool safer for exploratory use. Note that `download_attachment` can transfer binary data (base64-encoded) and supports `max_bytes` truncation to avoid overly large responses.
 
 4. **Connection Pooling**: Each tool call creates a fresh IMAP connection via context manager, ensuring clean state but potentially impacting performance for rapid sequential operations.
 
@@ -42,7 +42,7 @@ src/mcp_imap_server/
 
 **server.py**:
 - Defines the FastMCP instance with transport settings
-- Implements 4 MCP tools: `list_mailboxes`, `search_messages`, `get_message`, `set_seen`
+- Implements 5 MCP tools: `list_mailboxes`, `search_messages`, `get_message`, `download_attachment`, `set_seen`
 - Contains extensive logging for debugging HTTP transport issues
 - Handles transport selection and server startup
 
@@ -56,6 +56,7 @@ src/mcp_imap_server/
 - Email message parsing (RFC822, MIME multipart)
 - Body extraction (text/html with encoding handling)
 - Attachment metadata extraction
+- Attachment payload extraction (for `download_attachment`)
 - Date parsing utilities
 
 ## Tool Specifications
@@ -154,7 +155,7 @@ Retrieve full message content by UID.
 **Implementation Notes**:
 - Fetches full RFC822 message and parses locally
 - Body extraction handles multipart MIME, encoding detection
-- Attachments are metadata-only (no content download)
+- Attachments are metadata-only in this tool (use `download_attachment` to fetch attachment content)
 - Body truncation applies per-part for multipart messages
 
 ### 4. `set_seen(...)`
@@ -178,6 +179,41 @@ Mark a message as read or unread.
 - Only tool that modifies server state
 - Uses IMAP `STORE` command to add/remove `\Seen` flag
 - Requires readonly=False folder selection
+
+### 5. `download_attachment(...)`
+Download an attachment from a message by UID.
+
+**Parameters**:
+- `uid: int` - Message UID
+- `mailbox: str = "INBOX"` - Source folder
+- `attachment_index: int = 0` - 0-based index among attachments (used when `filename` is not provided)
+- `filename: str | None = None` - Exact filename match (preferred when known)
+- `max_bytes: int = 10_000_000` - If > 0, truncates returned bytes to this limit
+
+**Output Schema**:
+```python
+{
+  "uid": int,
+  "mailbox": str,
+  "message_size_bytes": int | None,
+  "message_internaldate": str | None,
+  "attachment": {
+    "index": int,
+    "filename": str | None,
+    "content_type": str,
+    "size_bytes": int,
+    "returned_bytes": int,
+    "truncated": bool,
+    "sha256": str
+  },
+  "content_base64": str
+}
+```
+
+**Implementation Notes**:
+- Returns attachment bytes as base64 for JSON transport safety
+- Designed to be read-only; no IMAP state is modified
+- Use `max_bytes` to avoid very large payloads
 
 ## Configuration
 
@@ -292,8 +328,8 @@ Check logs for:
    - Full-text search on body content
 
 3. **Attachment Handling**:
-   - `download_attachment(uid, attachment_index)` - Fetch attachment content
-   - Base64 encoding for binary attachments
+   - `download_attachment(uid, attachment_index|filename)` - Fetch attachment content (base64 encoded; implemented)
+   - For very large files, consider a future chunked/streaming download tool
 
 4. **Caching**:
    - Connection pooling for performance

@@ -14,6 +14,7 @@ from .config import ImapConfig
 from .imap import (
     envelope_to_dict,
     extract_bodies,
+    get_attachment_bytes,
     imap_connect,
     list_attachments,
     parse_rfc822,
@@ -272,6 +273,71 @@ def get_message(
             result["html"] = body.get("html", "")
 
     return result
+
+
+@mcp.tool()
+def download_attachment(
+    uid: int,
+    mailbox: str = "INBOX",
+    attachment_index: int = 0,
+    filename: str | None = None,
+    max_bytes: int = 10_000_000,
+) -> dict[str, Any]:
+    """Download an attachment from a message by UID.
+
+    The attachment content is returned as base64 for JSON safety.
+
+    Parameters:
+    - uid: Message UID
+    - mailbox: Folder name (default: INBOX)
+    - attachment_index: 0-based index among attachments (used if filename is not provided)
+    - filename: Exact attachment filename to match (preferred when known)
+    - max_bytes: If > 0, truncate the returned bytes to this limit
+    """
+
+    import base64
+    import hashlib
+
+    cfg = get_config()
+
+    with imap_connect(cfg) as client:
+        client.select_folder(mailbox, readonly=True)
+        fetched = client.fetch([uid], ["RFC822", "RFC822.SIZE", "INTERNALDATE"])
+
+    item = fetched.get(uid)
+    if not item:
+        raise ValueError(f"No message found for UID {uid} in {mailbox}")
+
+    raw_msg = _normalize_fetch_item(item, "RFC822")
+    if not isinstance(raw_msg, (bytes, bytearray)):
+        raise ValueError("Server did not return RFC822 bytes for message")
+
+    msg = parse_rfc822(bytes(raw_msg))
+
+    att = get_attachment_bytes(
+        msg,
+        attachment_index=attachment_index,
+        filename=filename,
+        max_bytes=max_bytes,
+    )
+
+    content_bytes = att.pop("content_bytes")
+    content_b64 = base64.b64encode(content_bytes).decode("ascii")
+
+    size = _normalize_fetch_item(item, "RFC822.SIZE")
+    internaldate = _normalize_fetch_item(item, "INTERNALDATE")
+
+    return {
+        "uid": int(uid),
+        "mailbox": mailbox,
+        "message_size_bytes": int(size) if size is not None else None,
+        "message_internaldate": internaldate.isoformat() if hasattr(internaldate, "isoformat") else None,
+        "attachment": {
+            **att,
+            "sha256": hashlib.sha256(content_bytes).hexdigest(),
+        },
+        "content_base64": content_b64,
+    }
 
 
 @mcp.tool()

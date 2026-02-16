@@ -7,6 +7,7 @@ A lightweight [Model Context Protocol (MCP)](https://modelcontextprotocol.io) se
 - 🔍 **Search emails** with flexible criteria (sender, subject, date range, text, etc.)
 - 📬 **List mailboxes** and folders in your IMAP account
 - 📧 **Retrieve messages** with full headers, body content, and attachment metadata
+- 📎 **Download attachments** (base64 encoded)
 - ✅ **Mark messages** as seen/unseen
 - 🔒 **Secure** - uses standard IMAP authentication
 - 🌐 **Flexible deployment** - supports both local (stdio) and remote (HTTP) modes
@@ -201,6 +202,18 @@ Retrieve full message content by UID.
 - `max_body_chars` (int, default: 20000) - Maximum body length
 
 **Returns:** Full message with headers, body, flags, and attachment metadata.
+
+### `download_attachment`
+Download a message attachment by UID.
+
+**Parameters:**
+- `uid` (int, required) - Message UID
+- `mailbox` (str, default: "INBOX") - Mailbox containing the message
+- `attachment_index` (int, default: 0) - 0-based index among attachments
+- `filename` (str, optional) - Exact filename match (preferred when known)
+- `max_bytes` (int, default: 10000000) - If > 0, truncate returned bytes to this limit
+
+**Returns:** Attachment metadata plus `content_base64`.
 
 ### `set_seen`
 Mark a message as read or unread.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from dataclasses import asdict
 from datetime import date, datetime
 from email import policy
 from email.header import decode_header
@@ -130,6 +129,76 @@ def parse_rfc822(message_bytes: bytes) -> Message:
     return BytesParser(policy=policy.default).parsebytes(message_bytes)
 
 
+def iter_attachment_parts(msg: Message) -> Iterator[Message]:
+    """Yield attachment parts in a stable order (walk order).
+
+    A part is considered an attachment if it has a filename.
+    """
+
+    for part in msg.walk():
+        filename = part.get_filename()
+        if filename:
+            yield part
+
+
+def get_attachment_bytes(
+    msg: Message,
+    *,
+    attachment_index: int = 0,
+    filename: str | None = None,
+    max_bytes: int = 10_000_000,
+) -> dict[str, Any]:
+    """Extract an attachment payload from an already-parsed RFC822 message.
+
+    Returns metadata plus a raw bytes payload (possibly truncated).
+
+    Notes:
+    - Attachment selection is either by exact filename match (preferred) or by index.
+    - If max_bytes > 0 and the attachment is larger, the returned payload is truncated.
+    """
+
+    parts = list(iter_attachment_parts(msg))
+    if not parts:
+        raise ValueError("Message has no attachments")
+
+    selected_part: Message | None = None
+    selected_index: int | None = None
+
+    if filename is not None:
+        for i, part in enumerate(parts):
+            if part.get_filename() == filename:
+                selected_part = part
+                selected_index = i
+                break
+        if selected_part is None:
+            raise ValueError(f"No attachment found with filename {filename!r}")
+    else:
+        if attachment_index < 0 or attachment_index >= len(parts):
+            raise ValueError(
+                f"attachment_index out of range: {attachment_index} (have {len(parts)} attachments)"
+            )
+        selected_index = attachment_index
+        selected_part = parts[attachment_index]
+
+    payload = selected_part.get_payload(decode=True) or b""
+    original_size = len(payload)
+
+    truncated = False
+    if max_bytes and max_bytes > 0 and original_size > max_bytes:
+        payload = payload[:max_bytes]
+        truncated = True
+
+    return {
+        "index": int(selected_index or 0),
+        "filename": selected_part.get_filename(),
+        "content_type": selected_part.get_content_type(),
+        "size_bytes": int(original_size),
+        "returned_bytes": int(len(payload)),
+        "truncated": truncated,
+        "content_bytes": payload,
+    }
+
+
 def extract_bodies(msg: Message, max_chars: int = 20000) -> dict[str, str]:
     text = ""
     html = ""
@@ -180,19 +249,13 @@ def extract_bodies(msg: Message, max_chars: int = 20000) -> dict[str, str]:
 
 def list_attachments(msg: Message) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    if not msg.is_multipart():
-        return out
 
-    for part in msg.walk():
-        filename = part.get_filename()
-        if not filename:
-            continue
-
+    for part in iter_attachment_parts(msg):
         ctype = part.get_content_type()
         payload = part.get_payload(decode=True) or b""
         out.append(
             {
-                "filename": filename,
+                "filename": part.get_filename(),
                 "content_type": ctype,
                 "size_bytes": len(payload),
             }
