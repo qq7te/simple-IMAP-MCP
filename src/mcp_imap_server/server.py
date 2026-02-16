@@ -281,6 +281,7 @@ def download_attachment(
     mailbox: str = "INBOX",
     attachment_index: int = 0,
     filename: str | None = None,
+    offset_bytes: int = 0,
     max_bytes: int = 10_000_000,
 ) -> dict[str, Any]:
     """Download an attachment from a message by UID.
@@ -292,6 +293,7 @@ def download_attachment(
     - mailbox: Folder name (default: INBOX)
     - attachment_index: 0-based index among attachments (used if filename is not provided)
     - filename: Exact attachment filename to match (preferred when known)
+    - offset_bytes: Start offset into the attachment payload (for chunked downloads)
     - max_bytes: If > 0, truncate the returned bytes to this limit
     """
 
@@ -318,6 +320,7 @@ def download_attachment(
         msg,
         attachment_index=attachment_index,
         filename=filename,
+        offset_bytes=offset_bytes,
         max_bytes=max_bytes,
     )
 

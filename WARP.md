@@ -188,6 +188,7 @@ Download an attachment from a message by UID.
 - `mailbox: str = "INBOX"` - Source folder
 - `attachment_index: int = 0` - 0-based index among attachments (used when `filename` is not provided)
 - `filename: str | None = None` - Exact filename match (preferred when known)
+- `offset_bytes: int = 0` - Start offset into the attachment payload (for chunked downloads)
 - `max_bytes: int = 10_000_000` - If > 0, truncates returned bytes to this limit
 
 **Output Schema**:
@@ -202,8 +203,11 @@ Download an attachment from a message by UID.
     "filename": str | None,
     "content_type": str,
     "size_bytes": int,
+    "offset_bytes": int,
     "returned_bytes": int,
     "truncated": bool,
+    "next_offset_bytes": int,
+    "done": bool,
     "sha256": str
   },
   "content_base64": str

@@ -211,6 +211,7 @@ Download a message attachment by UID.
 - `mailbox` (str, default: "INBOX") - Mailbox containing the message
 - `attachment_index` (int, default: 0) - 0-based index among attachments
 - `filename` (str, optional) - Exact filename match (preferred when known)
+- `offset_bytes` (int, default: 0) - Start offset into the attachment payload (for chunked downloads)
 - `max_bytes` (int, default: 10000000) - If > 0, truncate returned bytes to this limit
 
 **Returns:** Attachment metadata plus `content_base64`.

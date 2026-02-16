@@ -146,6 +146,7 @@ def get_attachment_bytes(
     *,
     attachment_index: int = 0,
     filename: str | None = None,
+    offset_bytes: int = 0,
     max_bytes: int = 10_000_000,
 ) -> dict[str, Any]:
     """Extract an attachment payload from an already-parsed RFC822 message.
@@ -154,7 +155,10 @@ def get_attachment_bytes(
 
     Notes:
     - Attachment selection is either by exact filename match (preferred) or by index.
-    - If max_bytes > 0 and the attachment is larger, the returned payload is truncated.
+    - offset_bytes selects where to start in the attachment payload.
+    - If max_bytes > 0 and the remaining bytes are larger, the returned payload is truncated.
+
+    This is intended to support chunked downloads over JSON transports.
     """
 
     parts = list(iter_attachment_parts(msg))
@@ -180,21 +184,35 @@ def get_attachment_bytes(
         selected_index = attachment_index
         selected_part = parts[attachment_index]
 
-    payload = selected_part.get_payload(decode=True) or b""
-    original_size = len(payload)
+    payload_all = selected_part.get_payload(decode=True) or b""
+    original_size = len(payload_all)
+
+    if offset_bytes < 0:
+        raise ValueError("offset_bytes must be >= 0")
+    if offset_bytes > original_size:
+        raise ValueError(
+            f"offset_bytes out of range: {offset_bytes} (attachment size is {original_size})"
+        )
+
+    payload = payload_all[offset_bytes:]
 
     truncated = False
-    if max_bytes and max_bytes > 0 and original_size > max_bytes:
+    if max_bytes and max_bytes > 0 and len(payload) > max_bytes:
         payload = payload[:max_bytes]
         truncated = True
+
+    next_offset = offset_bytes + len(payload)
 
     return {
         "index": int(selected_index or 0),
         "filename": selected_part.get_filename(),
         "content_type": selected_part.get_content_type(),
         "size_bytes": int(original_size),
+        "offset_bytes": int(offset_bytes),
         "returned_bytes": int(len(payload)),
         "truncated": truncated,
+        "next_offset_bytes": int(next_offset),
+        "done": bool(next_offset >= original_size),
         "content_bytes": payload,
     }
 
