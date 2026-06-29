@@ -9,6 +9,7 @@ A lightweight [Model Context Protocol (MCP)](https://modelcontextprotocol.io) se
 - 📧 **Retrieve messages** with full headers, body content, and attachment metadata
 - 📎 **Download attachments** (base64 encoded)
 - ✅ **Mark messages** as seen/unseen
+- 🗑️ **Mark messages** as deleted (`\\Deleted`) in batches of up to 10 (no expunge)
 - 🔒 **Secure** - uses standard IMAP authentication
 - 🌐 **Flexible deployment** - supports both local (stdio) and remote (HTTP) modes
 
@@ -226,13 +227,25 @@ Mark a message as read or unread.
 
 **Returns:** Updated message flags.
 
+### `mark_deleted`
+Mark up to 10 messages as deleted by setting the IMAP `\\Deleted` flag.
+
+This tool **does not expunge** messages. It only marks them so you can review
+or undo from your IMAP client before any permanent deletion.
+
+**Parameters:**
+- `uids` (list[int], required) - Message UIDs to mark as deleted (max 10)
+- `mailbox` (str, default: "INBOX") - Mailbox containing the messages
+
+**Returns:** Mailbox name, marked count, `expunged=false`, and per-message updated flags.
+
 ## Security Considerations
 
 - ⚠️ **App-Specific Passwords**: Use app-specific passwords instead of your main account password when possible
 - 🔒 **Firewall**: If running in HTTP mode on `0.0.0.0`, ensure your firewall restricts access appropriately
 - 🌐 **Network**: For remote access, consider using a VPN or SSH tunnel instead of exposing the server directly to the internet
 - 📝 **Environment Variables**: Never commit your `.env` file - it's already in `.gitignore`
-- 🔑 **Read-Only by Default**: Most operations are read-only except `set_seen`
+- 🔑 **Read-Only by Default**: Most operations are read-only except flag updates (`set_seen`, `mark_deleted`); `mark_deleted` does not expunge
 
 ## Development
 

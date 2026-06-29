@@ -368,6 +368,50 @@ def set_seen(uid: int, mailbox: str = "INBOX", seen: bool = True) -> dict[str, A
         ],
     }
 
+@mcp.tool()
+def mark_deleted(uids: list[int], mailbox: str = "INBOX") -> dict[str, Any]:
+    """Mark up to 10 messages as deleted by setting the IMAP \\Deleted flag.
+
+    This does not expunge messages; it only marks them so they can be reviewed
+    (and potentially undeleted) from an IMAP client.
+    """
+    if not uids:
+        raise ValueError("Provide at least one UID")
+
+    # De-duplicate while preserving order to avoid redundant flag updates.
+    uid_list = list(dict.fromkeys(int(uid) for uid in uids))
+    if len(uid_list) > 10:
+        raise ValueError("At most 10 unique UIDs can be marked deleted per call")
+    if any(uid <= 0 for uid in uid_list):
+        raise ValueError("All UIDs must be positive integers")
+
+    cfg = get_config()
+    with imap_connect(cfg) as client:
+        client.select_folder(mailbox, readonly=False)
+        client.add_flags(uid_list, ["\\Deleted"])
+        fetched = client.fetch(uid_list, ["FLAGS"])
+
+    messages: list[dict[str, Any]] = []
+    for uid in uid_list:
+        item = fetched.get(uid, {})
+        flags = _normalize_fetch_item(item, "FLAGS") or []
+        messages.append(
+            {
+                "uid": int(uid),
+                "flags": [
+                    f.decode() if isinstance(f, (bytes, bytearray)) else str(f)
+                    for f in (flags or [])
+                ],
+            }
+        )
+
+    return {
+        "mailbox": mailbox,
+        "marked_count": len(messages),
+        "expunged": False,
+        "messages": messages,
+    }
+
 
 def main() -> None:
     logger.info("Starting MCP IMAP server...")
